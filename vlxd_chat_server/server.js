@@ -1,177 +1,48 @@
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cửa Hàng Vật Liệu Xây Dựng</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f7f7f7; }
-    header { background: #2d6cdf; padding: 20px; color: white; text-align: center; }
-    .container { padding: 20px; max-width: 900px; margin: auto; }
-    .product-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
-    .card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-    .card h3 { margin-top: 0; }
-    .contact-btn { display: inline-block; background: #2d6cdf; color: white; padding: 12px 20px; border-radius: 8px; text-decoration: none; margin-top: 20px; }
-    footer { text-align: center; padding: 20px; background: #eee; margin-top: 40px; }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>Vật Liệu Xây Dựng </h1>
-    <p>Chất lượng - Uy tín - Giá tốt</p>
-  </header>
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const cors = require('cors');
+const path = require('path');
 
-  <div class="container">
-    <h2>Sản phẩm nổi bật</h2>
-    <div class="product-list">
-      <div class="card">
-        <h3>Cát xây dựng</h3>
-        <p>Cát vàng, cát bê tông chất lượng cao.</p>
-      </div>
-      <div class="card">
-        <h3>Đá 1x2</h3>
-        <p>Đá xây dựng sạch, đúng chuẩn.</p>
-      </div>
-      <div class="card">
-        <h3>Xà gồ thép</h3>
-        <p>Thép hộp, thép hình các loại.</p>
-      </div>
-    </div>
+const app = express();
+app.use(cors());
 
-    <a href="tel:0123456789" class="contact-btn">Liên hệ ngay</a>
-  </div>
+// Serve static files from the 'public' folder (so /admin.html is available)
+app.use(express.static(path.join(__dirname, 'public')));
 
-  <footer>
-    © 2025 Minh Phát VLXD
-  </footer>
-  <!-- Chatbox đơn giản -->
-  <style>
-    .chatbox {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      width: 300px;
-      background: white;
-      border-radius: 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-      overflow: hidden;
-      display: none;
-      flex-direction: column;
-      font-family: Arial, sans-serif;
-    }
-    .chatbox-header {
-      background: #2d6cdf;
-      color: white;
-      padding: 10px;
-      font-weight: bold;
-    }
-    .chatbox-messages {
-      height: 200px;
-      padding: 10px;
-      overflow-y: auto;
-      background: #f5f5f5;
-      font-size: 14px;
-    }
-    .chatbox-input {
-      display: flex;
-      border-top: 1px solid #ddd;
-    }
-    .chatbox-input input {
-      flex: 1;
-      padding: 10px;
-      border: none;
-      outline: none;
-    }
-    .chatbox-input button {
-      background: #2d6cdf;
-      color: white;
-      border: none;
-      padding: 10px 15px;
-      cursor: pointer;
-    }
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET','POST']
+  }
+});
 
-    /* Nút mở chat */
-    .chat-toggle {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      background: #2d6cdf;
-      color: white;
-      border-radius: 50%;
-      width: 55px;
-      height: 55px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-size: 26px;
-      cursor: pointer;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-    }
-  </style>
+// In-memory chat store
+const chats = {};
 
-  <div class="chat-toggle" onclick="toggleChat()">💬</div>
+io.on('connection', (socket) => {
+  socket.on('client_message', (payload) => {
+    const text = payload?.text || '';
+    if (!chats[socket.id]) chats[socket.id] = [];
+    chats[socket.id].push({ from: 'client', text, time: Date.now() });
 
-  <div class="chatbox" id="chatbox">
-    <div class="chatbox-header">Hỗ trợ khách hàng</div>
-    <div class="chatbox-messages" id="messages"></div>
-    <div class="chatbox-input">
-      <input type="text" id="chatInput" placeholder="Nhập tin nhắn..." />
-      <button onclick="sendMessage()">Gửi</button>
-    </div>
-  </div>
+    io.of('/admin').emit('new_message', { clientId: socket.id, text });
+  });
+});
 
-  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
-  <script>
-  const SERVER_URL = 'https://vlxd-chat-server.onrender.com';
-    // Thay đổi SERVER_URL thành địa chỉ server bạn deploy (ví dụ: https://your-server.com)
-    const SERVER_URL = 'https://vlxd-chat-server.onrender.com'; // <-- Thay bằng URL server của bạn
+const adminNs = io.of('/admin');
+adminNs.on('connection', (socket) => {
+  socket.on('list_clients', () => {
+    socket.emit('clients_list', Array.from(io.sockets.sockets.keys()));
+  });
 
-    // Kết nối Socket.IO cho khách hàng
-    const socket = io(SERVER_URL);
-    const messages = document.getElementById('messages');
-    const chatInput = document.getElementById('chatInput');
+  socket.on('admin_message', ({ targetClientId, text }) => {
+    const target = io.sockets.sockets.get(targetClientId);
+    if (target) target.emit('server_message', { text });
+  });
+});
 
-    function appendMessage(text, cls = '') {
-      const d = document.createElement('div');
-      if (cls) d.className = cls;
-      d.textContent = text;
-      messages.appendChild(d);
-      messages.scrollTop = messages.scrollHeight;
-    }
+app.get('/health', (req,res)=>res.json({ok:true}));
 
-    // Khi kết nối tới server thành công
-    socket.on('connect', () => {
-      appendMessage('Hệ thống: Đã kết nối tới server chat.');
-    });
-
-    // Khi có tin nhắn từ agent/admin gửi về
-    socket.on('server_message', (data) => {
-      // data = { from: "admin", text: "..." }
-      appendMessage('Nhân viên: ' + data.text);
-    });
-
-    // Gửi tin nhắn từ khách hàng lên server
-    function sendMessage() {
-      if (!chatInput || chatInput.value.trim() === '') return;
-      const text = chatInput.value.trim();
-      appendMessage('Bạn: ' + text);
-      socket.emit('client_message', { text });
-      chatInput.value = '';
-    }
-
-    // Bật/tắt chat
-    function toggleChat() {
-      const box = document.getElementById('chatbox');
-      box.style.display = box.style.display === 'flex' ? 'none' : 'flex';
-    }
-
-    // Submit on Enter
-    chatInput.addEventListener('keyup', function(e) {
-      if (e.key === 'Enter') sendMessage();
-    });
-  </script>
-
-</body>
-</html>
-
-
+server.listen(3000);
