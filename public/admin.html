@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Chat</title>
+
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body style="font-family: Arial; padding: 20px;">
+
+  <h2>ADMIN CHAT PANEL</h2>
+
+  <button onclick="loadClients()">Tải danh sách khách</button>
+  <ul id="clientList"></ul>
+
+  <h3 id="activeClient">Chưa chọn khách nào</h3>
+
+  <div id="history"></div>
+
+  <input id="adminMsg" placeholder="Nhập tin nhắn..." />
+  <button onclick="sendMsg()">Gửi</button>
+
+<script>
+  const adminSocket = io("/admin");
+
+  let currentClient = null;
+
+  function loadClients() {
+    adminSocket.emit("list_clients");
+  }
+
+  adminSocket.on("clients_list", (clients) => {
+    const ul = document.getElementById("clientList");
+    ul.innerHTML = "";
+
+    clients.forEach(id => {
+      const li = document.createElement("li");
+      li.textContent = id;
+      li.style.cursor = "pointer";
+      li.onclick = () => selectClient(id);
+      ul.appendChild(li);
+    });
+  });
+
+  function selectClient(id) {
+    currentClient = id;
+    document.getElementById("activeClient").textContent = "Đang chat với: " + id;
+    adminSocket.emit("get_history", id);
+  }
+
+  adminSocket.on("history", ({ clientId, history }) => {
+    const div = document.getElementById("history");
+    div.innerHTML = "<h4>Lịch sử chat:</h4>";
+
+    history.forEach(m => {
+      const p = document.createElement("p");
+      p.textContent = m.from + ": " + m.text;
+      div.appendChild(p);
+    });
+  });
+
+  function sendMsg() {
+    if (!currentClient) return alert("Chọn khách trước!");
+
+    const text = document.getElementById("adminMsg").value;
+    adminSocket.emit("admin_message", {
+      targetClientId: currentClient,
+      text
+    });
+  }
+
+  adminSocket.on("new_message", ({ clientId, text }) => {
+    if (clientId === currentClient) {
+      const div = document.getElementById("history");
+      const p = document.createElement("p");
+      p.textContent = "client: " + text;
+      div.appendChild(p);
+    }
+  });
+
+</script>
+
+</body>
+</html>
