@@ -1,139 +1,88 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Cửa Hàng Vật Liệu Xây Dựng</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f7f7f7; }
-    header { background: #2d6cdf; padding: 20px; color: white; text-align: center; }
-    .container { padding: 20px; max-width: 900px; margin: auto; }
-    .product-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
-    .card { background: white; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-    .card h3 { margin-top: 0; }
-    .contact-btn { display: inline-block; background: #2d6cdf; color: white; padding: 12px 20px; border-radius: 8px; text-decoration: none; margin-top: 20px; }
-    footer { text-align: center; padding: 20px; background: #eee; margin-top: 40px; }
-
-    /* Chatbox */
-    .chatbox {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      width: 300px;
-      background: white;
-      border-radius: 10px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-      overflow: hidden;
-      display: none;
-      flex-direction: column;
-      font-family: Arial, sans-serif;
-      z-index: 9999;
-    }
-    .chatbox-header { background: #2d6cdf; color: white; padding: 10px; font-weight: bold; }
-    .chatbox-messages { height: 220px; padding: 10px; overflow-y: auto; background: #f5f5f5; font-size: 14px; }
-    .chatbox-input { display: flex; border-top: 1px solid #ddd; }
-    .chatbox-input input { flex: 1; padding: 10px; border: none; outline: none; }
-    .chatbox-input button { background: #2d6cdf; color: white; border: none; padding: 10px 15px; cursor: pointer; }
-
-    .chat-toggle {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      background: #2d6cdf;
-      color: white;
-      border-radius: 50%;
-      width: 55px;
-      height: 55px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      font-size: 26px;
-      cursor: pointer;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-      z-index: 9999;
-    }
-  </style>
-</head>
-<body>
-  <header>
-    <h1>Vật Liệu Xây Dựng</h1>
-    <p>Chất lượng - Uy tín - Giá tốt</p>
-  </header>
-
-  <div class="container">
-    <h2>Sản phẩm nổi bật</h2>
-    <div class="product-list">
-      <div class="card">
-        <h3>Cát xây dựng</h3>
-        <p>Cát vàng, cát bê tông chất lượng cao.</p>
-      </div>
-      <div class="card">
-        <h3>Đá 1x2</h3>
-        <p>Đá xây dựng sạch, đúng chuẩn.</p>
-      </div>
-      <div class="card">
-        <h3>Xà gồ thép</h3>
-        <p>Thép hộp, thép hình các loại.</p>
-      </div>
-    </div>
-
-    <a href="tel:0123456789" class="contact-btn">Liên hệ ngay</a>
-  </div>
-
-  <footer>
-    © 2025 Minh Phát VLXD
-  </footer>
-
-  <!-- Chat Toggle -->
-  <div class="chat-toggle" onclick="toggleChat()">💬</div>
-
-  <!-- Chatbox -->
-  <div class="chatbox" id="chatbox">
-    <div class="chatbox-header">Hỗ trợ khách hàng</div>
-    <div class="chatbox-messages" id="messages"></div>
-    <div class="chatbox-input">
-      <input type="text" id="chatInput" placeholder="Nhập tin nhắn..." />
-      <button onclick="sendMessage()">Gửi</button>
-    </div>
-  </div>
-
+  <meta charset="UTF-8">
+  <title>Admin Chat</title>
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+</head>
+<body style="font-family: Arial; padding: 20px;">
+  <h2>ADMIN CHAT PANEL</h2>
+
+  <button onclick="loadClients()">Tải danh sách khách</button>
+  <ul id="clientList"></ul>
+
+  <h3 id="activeClient">Chưa chọn khách nào</h3>
+
+  <div id="history" style="border: 1px solid #ccc; padding: 10px; height: 300px; overflow-y: auto;"></div>
+
+  <input id="adminMsg" placeholder="Nhập tin nhắn..." style="width:70%;"/>
+  <button onclick="sendMsg()">Gửi</button>
 
   <script>
-    const SERVER_URL = "https://vlxd-chat-server.onrender.com";
-    const socket = io(SERVER_URL);
+    const adminSocket = io("/admin");
+    let currentClient = null;
 
-    function toggleChat() {
-      const box = document.getElementById("chatbox");
-      box.style.display = box.style.display === "flex" ? "none" : "flex";
+    function loadClients() {
+      adminSocket.emit("list_clients");
     }
 
-    function sendMessage() {
-      const input = document.getElementById("chatInput");
-      const messages = document.getElementById("messages");
+    adminSocket.on("clients_list", (clients) => {
+      const ul = document.getElementById("clientList");
+      ul.innerHTML = "";
+      clients.forEach(id => {
+        const li = document.createElement("li");
+        li.textContent = id;
+        li.style.cursor = "pointer";
+        li.onclick = () => selectClient(id);
+        ul.appendChild(li);
+      });
+    });
 
-      if (input.value.trim() === "") return;
-
-      const msg = document.createElement("div");
-      msg.textContent = "Bạn: " + input.value;
-      messages.appendChild(msg);
-
-      socket.emit("client_message", { text: input.value });
-
-      input.value = "";
-      messages.scrollTop = messages.scrollHeight;
+    function selectClient(id) {
+      currentClient = id;
+      document.getElementById("activeClient").textContent = "Đang chat với: " + id;
+      adminSocket.emit("get_history", id);
     }
 
-    // Nhận tin nhắn từ admin
-    socket.on("server_message", (data) => {
-      const messages = document.getElementById("messages");
-      const msg = document.createElement("div");
-      msg.textContent = "Admin: " + data.text;
-      msg.style.color = "blue";
-      messages.appendChild(msg);
-      messages.scrollTop = messages.scrollHeight;
+    adminSocket.on("history", ({ clientId, history }) => {
+      if (clientId !== currentClient) return;
+      const div = document.getElementById("history");
+      div.innerHTML = "";
+      history.forEach(m => {
+        const p = document.createElement("p");
+        p.textContent = (m.from === 'client' ? 'Khách: ' : 'Admin: ') + m.text;
+        div.appendChild(p);
+      });
+      div.scrollTop = div.scrollHeight;
+    });
+
+    function sendMsg() {
+      const text = document.getElementById("adminMsg").value;
+      if (!currentClient || !text.trim()) return alert("Chọn khách & nhập tin nhắn!");
+      adminSocket.emit("admin_message", { targetClientId: currentClient, text: text.trim() });
+      document.getElementById("adminMsg").value = "";
+      // Hiển thị trực tiếp trong lịch sử
+      const div = document.getElementById("history");
+      const p = document.createElement("p");
+      p.textContent = 'Admin: ' + text.trim();
+      p.style.color = 'blue';
+      div.appendChild(p);
+      div.scrollTop = div.scrollHeight;
+    }
+
+    adminSocket.on("new_message", ({ clientId, text }) => {
+      if (clientId === currentClient) {
+        const div = document.getElementById("history");
+        const p = document.createElement("p");
+        p.textContent = 'Khách: ' + text;
+        div.appendChild(p);
+        div.scrollTop = div.scrollHeight;
+      } else {
+        // Nếu là khách mới, có thể thông báo
+        alert('Khách mới: ' + clientId);
+        loadClients();
+      }
     });
   </script>
-
 </body>
 </html>
